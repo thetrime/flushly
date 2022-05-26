@@ -10,4 +10,4 @@ all: one.asm
 	avrasm2 -fI -Iinc -o one.hex one.asm
 
 deploy: one.hex
-	avrdude -p atmega328p -c usbasp-clone -U flash:w:one.hex:i
+	avrdude -p atmega328p -c usbasp-clone -U flash:w:one.hex:i -E noreset
