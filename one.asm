@@ -21,14 +21,17 @@ main:
 	out DDRC, r17
 
 						; Configure the timer
-	ldi r16, 0b00000010 
+						; First, configure the clock. We want 1Hz, and the clock rate is 1MHz (the crystal is 8MHz but it is already pre-scaled by 8) 
+						; This gives us (1000000/((15624+1)*64))
+	ldi r16, 0b00000010 ; Turn on the Output-compare-match flag
     sts TIMSK1, r16
     ldi r16, 0b00000000
     sts TCCR1A, r16
-	ldi r16, 0b00000100
+	ldi r16, 0b00000011 ; Set the prescale to 64
     sts TCCR1B, r16
-    ldi r16, 0b00001111
-    ldi r17, 0b00001001 
+						; Then set the counter to 15624
+    ldi r16, 0b00111101
+    ldi r17, 0b00001000 
     sts OCR1AH, r16
     sts OCR1AL, r17
 						; Start interrupts
