@@ -10,6 +10,7 @@
 ; r16 holds the status of the button (debounced)
 ; r18 holds the debounce info
 ; r20 holds the state 
+; r25 is used to save SREG during interrupts. Dont use it in the main loop!
 
 ; There are 5 states, and conveniently the state happens to correspond to the values in PORTC!
 ; State0: Waiting for something to happen (orange off, red off, motor off)
@@ -45,17 +46,17 @@ main:
 	out PORTD, r17
 
 						; Now configure the timer
-						; We want 100Hz, and the clock rate is 1MHz (the crystal is 8MHz but it is already pre-scaled by 8) 
-						; This gives us (1000000/((1249+1)*8))
+						; We want 10Hz, and the clock rate is 1MHz (the crystal is 8MHz but it is already pre-scaled by 8) 
+						; This gives us (1000000/((12499+1)*8))
 	ldi r16, 0b00000010 ; Turn on the Output-compare-match flag
     sts TIMSK1, r16
     ldi r16, 0b00000000
     sts TCCR1A, r16
 	ldi r16, 0b00001010 ; Set the prescale to 8
     sts TCCR1B, r16
-						; Then set the counter to 1249
-    ldi r16, 0b00000100
-    ldi r17, 0b11100001
+						; Then set the counter to 12499
+    ldi r16, 0b00110000 
+    ldi r17, 0b11010011
     sts OCR1AH, r16
     sts OCR1AL, r17
 
@@ -66,8 +67,9 @@ main:
 	sei
 						; Finally, main loop
 loop:
+						; FIXME: Replace with a jump table
+						; FIXME: When in state 0 we should probably sleep until the switch wakes us
 	out PORTC, r20
-
 	cpi r20, 0
 	breq state0
 	cpi r20, 1
@@ -94,12 +96,12 @@ misfire:
 
 state0:
 						; In state 0, we are waiting for a button press
-	sbrs r16, 1			; Skip the next line if button is pressed
+	sbrs r16, 0			; Skip the next line if button is pressed
 	rjmp loop			; If no button press, we are done
 	ldi r20, 1			; If we detect a button press, start the counter and go to state 1
-	ldi r21, 255
-	out PORTC, r16		; Set the orange LED
-						; Moving to state 1
+	ldi r21, 50
+	out PORTC, r20		; Set the orange LED
+						; Fall through to state 1
 state1:
 						; In state 1, we are waiting to run the timer out. The orange LED is lit
 	cpi r16, 1			; First, check if the button is still pressed
@@ -109,26 +111,26 @@ state1:
 						; Moving to state 2
 	ldi r20, 2
 	out PORTC,  r20		; Conveniently, the state is now also the value we would want to write to PORTC to turn off the orange and on the red LED
-
+						; Fall through to state 2
 state2:
 						; In state 2 we are waiting for the button to become unpressed
 	cpi r16, 1			; Is the button pressed?
 	breq loop			; If yes, then loop
 						; If no, then move to state 3
-	ldi r21, 255		; Start the counter
+	ldi r21, 50  		; Start the counter
 	ldi r20, 3
 	out PORTC, r20		; Again, conveniently, both lights should be on in state 3
 
 state3:
 						; In state 3 we are waiting for the timer to run out. The orange LED is lit again
 	cpi r16, 1			; First, check if the button is still pressed
-	brne nervous		; Oops, go back to state 2
+	breq nervous		; Oops, go back to state 2
 	cpi r21, 0			; Otherwise, check the status of the counter. If it is zero, we can move to state 4
 	brne loop			; If not 0, then keep looping
 						; Moving to state 4
 	ldi r20, 4
 	out PORTC,  r20		; Conveniently, the state is once again the value we would want to write to PORTC to turn off the orange and off the red LED and turn the motor
-	ldi r21, 255		; Reload the counter
+	ldi r21, 100		; Reload the counter
 
 state4:
 						; in state4 we just wait for 10 seconds then move to state0
@@ -141,6 +143,7 @@ state4:
 
 
 timer1:
+	in r25, SREG		; save SREG!
 						; First, reset the timer
     ldi r17, 0
     sts TCNT1H, r17
@@ -156,6 +159,7 @@ timer1:
 	cpi r18, 0x80		; If 0b10000000 then we have just detected the switch is on
 	brne notPressed
 	ldi r16, 1			; Set r16 to indicate switch is on
+	rjmp notReleased
 notPressed:
 	cpi r18, 0x7f		; If 0b01111111 then we have just detected the switch is off
 	brne notReleased		
@@ -164,5 +168,5 @@ notReleased:
 						; End of debounce
 
 	dec r21				; Decrement the timer in case we are in state 1 or 2
-
+	out SREG, r25		; Restore SREG
 	reti
