@@ -2,7 +2,7 @@
 # because I could not work out the syntax for Microsoft's insane file structure
 
 # The path for avrasm2 can be achieved with
-# set PATH=%PATH%;"c:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avrassembler;c:\opt\avrdude" 
+# set PATH=%PATH%;c:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avrassembler;c:\opt\avrdude
 
 # Why am I not just using Linux? :(
 
